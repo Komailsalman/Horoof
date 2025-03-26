@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>عرض الحالة</title>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
+</head>
+<body>
+  <h2>الزر المضغوط:</h2>
+  <h1 id="status">--</h1>
+  <button onclick="resetState()">استعادة الأزرار</button>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "API_KEY",
+      authDomain: "PROJECT_ID.firebaseapp.com",
+      databaseURL: "https://PROJECT_ID.firebaseio.com",
+      projectId: "PROJECT_ID",
+      storageBucket: "PROJECT_ID.appspot.com",
+      messagingSenderId: "SENDER_ID",
+      appId: "APP_ID"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    const statusText = document.getElementById('status');
+
+    db.ref('buttonState').on('value', (snapshot) => {
+      const val = snapshot.val();
+      if (val && val.pressed) {
+        statusText.innerText = val.pressed === 'red' ? 'أحمر' : 'أخضر';
+      } else {
+        statusText.innerText = '--';
+      }
+    });
+
+    function resetState() {
+      db.ref('buttonState').set({ pressed: null });
+    }
+  </script>
+</body>
+</html>
