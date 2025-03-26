@@ -1,25 +1,53 @@
 <!DOCTYPE html>
-<html>
+<html lang="ar">
 <head>
-  <title>التحكم في الأزرار</title>
+  <meta charset="UTF-8">
+  <title>صفحة التحكم</title>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
+  <style>
+    body {
+      text-align: center;
+      font-family: Arial;
+      margin-top: 100px;
+    }
+    button {
+      width: 80%;
+      height: 200px;
+      font-size: 60px;
+      margin: 30px;
+      border: none;
+      border-radius: 20px;
+      color: white;
+      cursor: pointer;
+    }
+    #redBtn {
+      background-color: red;
+    }
+    #greenBtn {
+      background-color: green;
+    }
+    button:disabled {
+      background-color: gray !important;
+      cursor: not-allowed;
+    }
+  </style>
 </head>
 <body>
   <h2>صفحة التحكم</h2>
-  <button id="redBtn" style="background-color:red; color:white; font-size:24px;">أحمر</button>
-  <br><br>
-  <button id="greenBtn" style="background-color:green; color:white; font-size:24px;">أخضر</button>
+  <button id="redBtn">أحمر</button>
+  <br>
+  <button id="greenBtn">أخضر</button>
 
   <script>
     const firebaseConfig = {
       apiKey: "AIzaSyAd8gOj9NUlYW_alEidKdz6699DWasiPvk",
-  authDomain: "horoof-81eb4.firebaseapp.com",
-  databaseURL: "https://horoof-81eb4-default-rtdb.firebaseio.com",
-  projectId: "horoof-81eb4",
-  storageBucket: "horoof-81eb4.firebasestorage.app",
-  messagingSenderId: "458231911984",
-  appId: "1:458231911984:web:cee923fc947466d51efff5"
+      authDomain: "horoof-81eb4.firebaseapp.com",
+      databaseURL: "https://horoof-81eb4-default-rtdb.firebaseio.com",
+      projectId: "horoof-81eb4",
+      storageBucket: "horoof-81eb4.firebasestorage.app",
+      messagingSenderId: "458231911984",
+      appId: "1:458231911984:web:cee923fc947466d51efff5"
     };
 
     firebase.initializeApp(firebaseConfig);
