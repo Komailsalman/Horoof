@@ -1,82 +1,108 @@
 <!DOCTYPE html>
-<html lang="ar">
+<html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8">
-  <title>صفحة التحكم</title>
-  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
+  <title>الطلبات</title>
   <style>
     body {
-      text-align: center;
-      font-family: Arial;
-      margin-top: 100px;
+      font-family: sans-serif;
+      padding: 20px;
+      background: #f5f5f5;
     }
-    button {
-      width: 80%;
-      height: 600px;
-      font-size: 60px;
-      margin: 30px;
-      border: none;
-      border-radius: 20px;
-      color: white;
-      cursor: pointer;
+    .container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
     }
-    #redBtn {
-      background-color: red;
+    .card {
+      background: white;
+      padding: 15px;
+      border-radius: 10px;
+      box-shadow: 0 0 5px #ccc;
+      width: 300px;
     }
-    #greenBtn {
-      background-color: green;
+    .card h3 {
+      margin-top: 0;
     }
-    button:disabled {
-      background-color: gray !important;
-      cursor: not-allowed;
+    .item {
+      background: #f0f0f0;
+      padding: 5px;
+      margin-bottom: 5px;
+      border-radius: 5px;
     }
+    
   </style>
 </head>
 <body>
-  <h2>صفحة التحكم</h2>
-  <button id="redBtn">أحمر</button>
-  <br>
-  <button id="greenBtn">أخضر</button>
 
-  <script>
-    const firebaseConfig = {
-      apiKey: "AIzaSyAd8gOj9NUlYW_alEidKdz6699DWasiPvk",
-      authDomain: "horoof-81eb4.firebaseapp.com",
-      databaseURL: "https://horoof-81eb4-default-rtdb.firebaseio.com",
-      projectId: "horoof-81eb4",
-      storageBucket: "horoof-81eb4.firebasestorage.app",
-      messagingSenderId: "458231911984",
-      appId: "1:458231911984:web:cee923fc947466d51efff5"
-    };
+<h1>الطلبات المسجلة</h1>
+<div class="container" id="ordersContainer"></div>
 
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<script>
+  // إعداد Firebase
+  firebase.initializeApp({
+    apiKey: "AIzaSyAd8gOj9NUlYW_alEidKdz6699DWasiPvk",
+    authDomain: "horoof-81eb4.firebaseapp.com",
+    projectId: "horoof-81eb4"
+  });
+  const db = firebase.firestore();
 
-    const redBtn = document.getElementById('redBtn');
-    const greenBtn = document.getElementById('greenBtn');
+  const container = document.getElementById('ordersContainer');
 
-    redBtn.onclick = () => {
-      db.ref('buttonState').set({ pressed: 'red' });
-    };
+  // دالة لإنشاء بطاقة للطلب
+  <!-- داخل ملف HTML (مكان البطاقة داخل الدالة renderOrder) -->
 
-    greenBtn.onclick = () => {
-      db.ref('buttonState').set({ pressed: 'green' });
-    };
+  
+  
 
-    db.ref('buttonState').on('value', (snapshot) => {
-      const val = snapshot.val();
-      if (val && val.pressed === 'red') {
-        redBtn.disabled = false;
-        greenBtn.disabled = true;
-      } else if (val && val.pressed === 'green') {
-        greenBtn.disabled = false;
-        redBtn.disabled = true;
-      } else {
-        redBtn.disabled = false;
-        greenBtn.disabled = false;
-      }
+
+  function renderOrder(doc) {
+  const data = doc.data();
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.innerHTML = `
+    <h3>طلب رقم ${data.dailyOrderNumber || '-'}</h3>
+    <p><small>${new Date(data.time).toLocaleString()}</small></p>
+    <table style="width: 100%; border-collapse: collapse;">
+      <thead>
+        <tr>
+          <th style="text-align:right; border: 1px solid #ccc; padding: 8px;">الكمية</th>
+          <th style="text-align:right; border: 1px solid #ccc; padding: 8px;">المنتج</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${data.items.map((item, index) => {
+          // تنظيف الملاحظة من الرموز والأرقام
+          let cleanedNote = item.note?.replace(/\(.*?\)/g, '').trim() || '';
+
+          return `
+            <tr style="background-color: ${index % 2 === 0 ? '#ffffff' : '#f9f9f9'};">
+              <td style="padding: 8px; text-align: center; border: 1px solid #ccc;">${item.quantity}</td>
+              <td style="padding: 8px; border: 1px solid #ccc;">
+                ${item.name}
+                ${cleanedNote ? `<br><small style="color:gray;">${cleanedNote}</small>` : ''}
+              </td>
+            </tr>
+          `;
+        }).join('')}
+      </tbody>
+    </table>
+  `;
+  container.prepend(card); // الأحدث فوق
+}
+
+
+
+  // مراقبة التغيرات مباشرة
+  db.collection("kitchenOrders").orderBy("time", "asc")
+    .onSnapshot(snapshot => {
+      container.innerHTML = ""; // إعادة تحميل كامل
+      snapshot.forEach(doc => renderOrder(doc));
     });
-  </script>
+</script>
+
 </body>
 </html>
