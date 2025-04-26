@@ -20,6 +20,7 @@
       border-radius: 10px;
       box-shadow: 0 0 5px #ccc;
       width: 300px;
+      
     }
     .card h3 {
       margin-top: 0;
@@ -30,6 +31,14 @@
       margin-bottom: 5px;
       border-radius: 5px;
     }
+
+    .fade-out {
+  opacity: 0;
+  transform: scale(0.95);
+  transition: all 0.5s ease;
+}
+
+
     
   </style>
 </head>
@@ -58,42 +67,232 @@
   
   
 
-
   function renderOrder(doc) {
   const data = doc.data();
   const card = document.createElement('div');
   card.className = 'card';
-  card.innerHTML = `
-    <h3>طلب رقم ${data.dailyOrderNumber || '-'}</h3>
-    <p><small>${new Date(data.time).toLocaleString()}</small></p>
-    <table style="width: 100%; border-collapse: collapse;">
-      <thead>
-        <tr>
-          <th style="text-align:right; border: 1px solid #ccc; padding: 8px;">الكمية</th>
-          <th style="text-align:right; border: 1px solid #ccc; padding: 8px;">المنتج</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${data.items.map((item, index) => {
-          // تنظيف الملاحظة من الرموز والأرقام
-          let cleanedNote = item.note?.replace(/\(.*?\)/g, '').trim() || '';
 
-          return `
-            <tr style="background-color: ${index % 2 === 0 ? '#ffffff' : '#f9f9f9'};">
-              <td style="padding: 8px; text-align: center; border: 1px solid #ccc;">${item.quantity}</td>
-              <td style="padding: 8px; border: 1px solid #ccc;">
-                ${item.name}
-                ${cleanedNote ? `<br><small style="color:gray;">${cleanedNote}</small>` : ''}
-              </td>
-            </tr>
-          `;
-        }).join('')}
-      </tbody>
-    </table>
-  `;
-  container.prepend(card); // الأحدث فوق
+  card.innerHTML = `
+  <h3>طلب رقم ${data.dailyOrderNumber || '-'}</h3>
+  <p><small>${new Date(data.time).toLocaleString()}</small></p>
+  <button class="deliver-btn" style="margin-bottom: 10px; padding: 8px 12px; background-color: #4CAF50; color: white; border: none; cursor: pointer;">🟢 تسليم الطلب</button>
+  <table style="width: 100%; border-collapse: collapse;">
+    <thead>
+      <tr>
+        <th style="text-align:right; border: 1px solid #ccc; padding: 8px;">الكمية</th>
+        <th style="text-align:right; border: 1px solid #ccc; padding: 8px;">المنتج</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${data.items.map((item, index) => {
+        let cleanedNote = item.note?.replace(/\(.*?\)/g, '').trim() || '';
+        return `
+          <tr class="item-row" style="background-color: ${index % 2 === 0 ? '#ffffff' : '#f9f9f9'};">
+            <td style="padding: 8px; text-align: center; border: 1px solid #ccc;">${item.quantity}</td>
+            <td style="padding: 8px; border: 1px solid #ccc;">
+              ${item.name}
+              ${cleanedNote ? `<br><small style="color:gray;">${cleanedNote}</small>` : ''}
+            </td>
+          </tr>
+        `;
+      }).join('')}
+
+      
+    </tbody>
+  </table>
+`;
+
+
+
+// إضافة عداد الوقت تحت الجدول
+const timerDiv = document.createElement('div');
+timerDiv.style.marginTop = '10px';
+timerDiv.style.fontSize = '14px';
+timerDiv.style.fontWeight = 'bold';
+timerDiv.style.color = '#555';
+card.appendChild(timerDiv);
+
+function updateTimer() {
+  const orderTime = new Date(data.time);
+  const now = new Date();
+  const diffMs = now - orderTime;
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffSecs = Math.floor((diffMs % 60000) / 1000);
+  
+  // تحديث النص
+  timerDiv.innerText = `مدة الانتظار: ${diffMins} دقيقة ${diffSecs < 10 ? '0' : ''}${diffSecs} ثانية`;
+
+  // تغيير اللون بعد 10 دقائق
+  if (diffMins >= 10) {
+    timerDiv.style.color = 'red';
+  } else {
+    timerDiv.style.color = '#555'; // يرجع للون العادي لو أقل من 10 دقايق
+  }
 }
 
+updateTimer();
+setInterval(updateTimer, 1000);
+
+  // بعد إنشاء البطاقة، أضف كود التحكم بالضغط
+  setTimeout(() => {
+  const rows = card.querySelectorAll('.item-row');
+  rows.forEach((row, index) => {
+    row.addEventListener('click', () => {
+      if (row.classList.contains('completed')) {
+        // إذا كان مضغوط مسبقاً ➔ رجع اللون الطبيعي
+        row.style.backgroundColor = (index % 2 === 0) ? '#ffffff' : '#f9f9f9';
+        row.classList.remove('completed');
+      } else {
+        // إذا كان غير مضغوط ➔ لونه أخضر
+        row.style.backgroundColor = '#88d88a';
+        row.classList.add('completed');
+      }
+
+      // تحقق بعد كل ضغطة
+      const allCompleted = [...rows].every(r => r.classList.contains('completed'));
+      if (allCompleted) {
+      
+      
+      
+      
+        if (data) {
+  db.collection('DoneOrders').doc(data.orderNumber).set(data)
+  .then(async () => {
+  console.log('🗑️ تم حذف الطلب من kitchenOrders:', data.orderNumber);
+
+  // 👇 هنا تسجل وقت التسليم والمدة
+  const deliveredTime = new Date();
+  const createdTime = new Date(data.time);
+  const diffMs = deliveredTime - createdTime;
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffSecs = Math.floor((diffMs % 60000) / 1000);
+
+  await db.collection('DoneOrders').doc(data.orderNumber).update({
+    deliveredTime: deliveredTime.toISOString(),
+    duration: `${diffMins} دقيقة ${diffSecs < 10 ? '0' : ''}${diffSecs} ثانية`
+  });
+  console.log('📝 تم تحديث وقت التسليم والمدة للطلب:', data.orderNumber);
+
+
+  // 🔥 حذف الطلب من kitchenOrders بعد التحديث
+  await db.collection('kitchenOrders').doc(data.orderNumber).delete();
+  console.log('🗑️ تم حذف الطلب من kitchenOrders:', data.orderNumber);
+  
+  // حذف البطاقة من الصفحة بعد الترحيل
+  card.classList.add('fade-out');
+  setTimeout(() => {
+    card.remove();
+  }, 500);
+})
+
+}
+
+
+        card.classList.add('fade-out');
+setTimeout(() => {
+  card.remove();
+}, 500); // نفس مدة الترانزيشن بالضبط
+
+      }
+    });
+  });
+}, 100);
+
+
+
+
+
+
+// زر تسليم الطلب مع عداد تنازلي
+const deliverBtn = card.querySelector('.deliver-btn');
+let countdown = null;
+let timer = null;
+
+deliverBtn.addEventListener('click', () => {
+  const rows = card.querySelectorAll('.item-row');
+
+  if (timer) {
+    // إلغاء العد وإرجاع الحالة الطبيعية
+    clearInterval(timer);
+    timer = null;
+    countdown = null;
+    deliverBtn.disabled = false;
+    deliverBtn.innerText = '🟢 تسليم الطلب';
+
+    // رجع الصفوف للونها الطبيعي
+    rows.forEach((row, index) => {
+      row.style.backgroundColor = (index % 2 === 0) ? '#ffffff' : '#f9f9f9';
+      row.classList.remove('completed');
+    });
+
+    console.log('⏹️ تم إلغاء تسليم الطلب');
+  } else {
+    // بدء العد التنازلي
+    rows.forEach(row => {
+      row.style.backgroundColor = '#88d88a';
+      row.classList.add('completed');
+    });
+
+    countdown = 3;
+    deliverBtn.disabled = false;
+    deliverBtn.innerText = `سيتم تسليم الطلب بعد ${countdown}`;
+
+    timer = setInterval(() => {
+      countdown--;
+      if (countdown > 0) {
+        deliverBtn.innerText = `سيتم تسليم الطلب بعد ${countdown}`;
+      } else {
+        clearInterval(timer);
+        timer = null;
+        if (data) {
+  db.collection('DoneOrders').doc(data.orderNumber).set(data)
+  .then(async () => {
+  console.log('🗑️ تم حذف الطلب من kitchenOrders:', data.orderNumber);
+
+  // 👇 هنا تسجل وقت التسليم والمدة
+  const deliveredTime = new Date();
+  const createdTime = new Date(data.time);
+  const diffMs = deliveredTime - createdTime;
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffSecs = Math.floor((diffMs % 60000) / 1000);
+
+  await db.collection('DoneOrders').doc(data.orderNumber).update({
+    deliveredTime: deliveredTime.toISOString(),
+    duration: `${diffMins} دقيقة ${diffSecs < 10 ? '0' : ''}${diffSecs} ثانية`
+  });
+  console.log('📝 تم تحديث وقت التسليم والمدة للطلب:', data.orderNumber);
+
+    // 🔥 حذف الطلب من kitchenOrders بعد التحديث
+  await db.collection('kitchenOrders').doc(data.orderNumber).delete();
+console.log('🗑️ تم حذف الطلب من kitchenOrders:', data.orderNumber);
+
+  // حذف البطاقة من الصفحة بعد الترحيل
+  card.classList.add('fade-out');
+  setTimeout(() => {
+    card.remove();
+  }, 500);
+})
+
+}
+
+       card.classList.add('fade-out');
+setTimeout(() => {
+  card.remove();
+}, 500); // نفس مدة الترانزيشن بالضبط
+
+      }
+    }, 1000);
+  }
+});
+
+
+
+
+
+
+
+  container.prepend(card);
+}
 
 
   // مراقبة التغيرات مباشرة
