@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8">
+  <title>تحليلات الطلبات</title>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f5f5f5; padding: 20px; direction: rtl; }
+    h1 { text-align: center; color: #176B87; margin-bottom: 20px; }
+    .filter-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+    .filter-buttons button {
+      background: #176B87;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      font-size: 15px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .filter-buttons button.active {
+      background: #0d4a5b;
+    }
+    .date-range {
+      display: none;
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .date-range input {
+      padding: 8px;
+      font-size: 14px;
+      margin: 0 10px;
+    }
+    .cards-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      justify-content: space-between;
+      margin-bottom: 30px;
+    }
+    .card {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 0 5px #ccc;
+      padding: 15px;
+      width: calc(33.33% - 13.33px);
+      box-sizing: border-box;
+    }
+    .card.full { width: 100%; }
+    .card h4 { margin: 0 0 10px; color: #176B87; font-size: 16px; }
+    .card p { margin: 5px 0; font-size: 18px; font-weight: bold; color: #000; }
+    canvas { width: 100% !important; height: auto !important; }
+  </style>
+</head>
+<body>
+  <h1>📊 تحليلات الطلبات التامة</h1>
+
+  <div class="filter-buttons">
+    <button data-filter="day">📆 يوم</button>
+    <button data-filter="week">📅 أسبوع</button>
+    <button data-filter="month">🗓️ شهر</button>
+    <button data-filter="range">📊 فترة مخصصة</button>
+    <button data-filter="all" class="active">📈 كل الفترة</button>
+  </div>
+
+  <div class="date-range" id="dateRange">
+    من: <input type="date" id="startDate">
+    إلى: <input type="date" id="endDate">
+  </div>
+
+  <!-- شارات -->
+  <div class="cards-container">
+    <div class="card"><h4>📦 عدد الطلبات</h4><p id="total-orders">-</p></div>
+    <div class="card"><h4>🥇 المنتج الأكثر طلبًا</h4><p id="top-product">-</p></div>
+    <div class="card"><h4>⏱ متوسط وقت تجهيز الطلبات</h4><p id="avg-time">-</p></div>
+  </div>
+
+    <!-- شارتات رئيسية -->
+    <div class="cards-container">
+        <div class="card"><h4>١. المنتجات الأكثر طلبًا</h4><canvas id="topProductsChart"></canvas></div>
+        <div class="card"><h4>٢. متوسط وقت تجهيز المنتجات</h4><canvas id="avgPrepChart"></canvas></div>
+        <div class="card"><h4>٣. الطلبات الأبطأ (أقل من ١٥ دقيقة)</h4><canvas id="slowOrdersChart"></canvas></div>
+   
+        <div class="card"><h4>٤. أكثر الأيام نشاطًا</h4><canvas id="topDaysChart"></canvas></div>
+   
+        <div class="card"><h4>٥. عدد المنتجات حسب الكمية</h4><canvas id="qtyCountChart"></canvas></div>
+        <div class="card"><h4>٦. الساعة الأعلى طلبًا لكل يوم</h4><canvas id="peakHourPerDayChart"></canvas></div>
+        <div class="card"><h4>٧. أوقات الذروة (الساعة)</h4><canvas id="hourDistributionChart"></canvas></div>
+  
+
+        <div class="card"><h4>٨. معدل عدد المنتجات لكل طلب</h4><canvas id="avgItemsPerOrderChart"></canvas></div>
+        <div class="card"><h4>٩. عدد الطلبات حسب عدد المنتجات داخلها</h4><canvas id="orderSizeChart"></canvas></div>
+      </div>
+    
+      <script>
+        const config = {
+          apiKey: "AIzaSyAd8gOj9NUlYW_alEidKdz6699DWasiPvk",
+          authDomain: "horoof-81eb4.firebaseapp.com",
+          projectId: "horoof-81eb4"
+        };
+        firebase.initializeApp(config);
+        const db = firebase.firestore();
+    
+        const buttons = document.querySelectorAll(".filter-buttons button");
+        const dateRangeDiv = document.getElementById("dateRange");
+        const startDateInput = document.getElementById("startDate");
+        const endDateInput = document.getElementById("endDate");
+    
+        let allOrders = [];
+        let charts = {};
+    
+        function destroyCharts() {
+          for (const key in charts) {
+            if (charts[key]) charts[key].destroy();
+          }
+          charts = {};
+        }
+    
+        function parseDuration(start, end) {
+          return (new Date(end) - new Date(start)) / 60000;
+        }
+    
+        function formatDate(d) {
+          const iso = new Date(d).toISOString();
+          return iso.split("T")[0];
+        }
+    
+        function getHour(d) {
+          return new Date(d).getHours();
+        }
+    
+        function getPeakHourPerDay(orders) {
+          const perDay = {};
+          for (let order of orders) {
+            const day = formatDate(order.time);
+            const hour = getHour(order.time);
+            if (!perDay[day]) perDay[day] = {};
+            perDay[day][hour] = (perDay[day][hour] || 0) + 1;
+          }
+          const result = {};
+          for (let day in perDay) {
+            let maxHour = Object.entries(perDay[day]).sort((a,b) => b[1] - a[1])[0];
+            result[day] = maxHour[0];
+          }
+          return result;
+        }
+    
+        function drawCharts(filtered) {
+          destroyCharts();
+    
+          let productStats = {};
+          let prepTimes = [];
+          let slowOrders = [];
+          let orderDates = {};
+          let qtyCount = {};
+          let orderSizes = [];
+          let hourDist = [];
+    
+          filtered.forEach(order => {
+            const dur = parseDuration(order.time, order.deliveredTime);
+            if (!isFinite(dur) || dur > 15) return;
+    
+            prepTimes.push(dur);
+            const itemCount = order.items.length;
+            orderSizes.push(itemCount);
+            hourDist.push(getHour(order.time));
+    
+            order.items.forEach(item => {
+              const name = item.name?.replace(/\s*\(.*?\)/g, '').trim();
+              const qty = parseInt(item.quantity || 1);
+              if (!name || isNaN(qty)) return;
+    
+              if (!productStats[name]) productStats[name] = { count: 0, times: [] };
+              productStats[name].count += qty;
+              productStats[name].times.push(dur);
+    
+              qtyCount[qty] = (qtyCount[qty] || 0) + 1;
+            });
+    
+            slowOrders.push({
+              orderNumber: order.orderNumber,
+              duration: dur.toFixed(1)
+            });
+    
+            const day = formatDate(order.time);
+            orderDates[day] = (orderDates[day] || 0) + 1;
+          });
+    
+          const topProducts = Object.entries(productStats).sort((a,b)=>b[1].count - a[1].count).slice(0,10);
+          const avgTimes = topProducts.map(p => (p[1].times.reduce((a,b)=>a+b,0)/p[1].times.length).toFixed(1));
+    
+          document.getElementById("total-orders").textContent = prepTimes.length;
+          document.getElementById("avg-time").textContent = prepTimes.length ? 
+            (prepTimes.reduce((a,b)=>a+b,0)/prepTimes.length).toFixed(1) + " دقيقة" : "-";
+          document.getElementById("top-product").textContent = topProducts[0]?.[0] || "-";
+    
+          const ctx = id => document.getElementById(id);
+          const chart = (id, label, labels, data, color) =>
+            charts[id] = new Chart(ctx(id), {
+              type: "bar",
+              data: {
+                labels: labels,
+                datasets: [{ label, data, backgroundColor: color }]
+              }
+            });
+    
+          chart("topProductsChart", "عدد الطلبات", topProducts.map(p=>p[0]), topProducts.map(p=>p[1].count), "#4caf50");
+          chart("avgPrepChart", "دقائق", topProducts.map(p=>p[0]), avgTimes, "#2196f3");
+          chart("slowOrdersChart", "مدة التجهيز", slowOrders.map(o=>`طلب ${o.orderNumber}`), slowOrders.map(o=>o.duration), "#f44336");
+          chart("topDaysChart", "عدد الطلبات", Object.keys(orderDates), Object.values(orderDates), "#FF9800");
+    
+          chart("qtyCountChart", "عدد مرات الطلب", Object.keys(qtyCount), Object.values(qtyCount), "#8e44ad");
+          const peakPerDay = getPeakHourPerDay(filtered);
+          chart("peakHourPerDayChart", "الساعة الأعلى", Object.keys(peakPerDay), Object.values(peakPerDay), "#009688");
+    
+          const hourMap = {};
+          hourDist.forEach(h => hourMap[h] = (hourMap[h] || 0) + 1);
+          chart("hourDistributionChart", "عدد الطلبات", Object.keys(hourMap), Object.values(hourMap), "#03a9f4");
+    
+          const avgItems = orderSizes.reduce((a,b)=>a+b,0) / orderSizes.length || 0;
+          chart("avgItemsPerOrderChart", "معدل المنتجات", [""], [avgItems.toFixed(2)], "#607d8b");
+    
+          const sizeMap = {};
+          orderSizes.forEach(s => sizeMap[s] = (sizeMap[s] || 0) + 1);
+          chart("orderSizeChart", "عدد الطلبات", Object.keys(sizeMap), Object.values(sizeMap), "#795548");
+        }
+    
+        function applyFilter(type) {
+          buttons.forEach(b => b.classList.remove("active"));
+          document.querySelector(`[data-filter="${type}"]`).classList.add("active");
+          dateRangeDiv.style.display = type === "range" ? "block" : "none";
+    
+          let filtered = [...allOrders];
+    
+          const now = new Date();
+          if (type === "day") {
+            const today = formatDate(now);
+            filtered = filtered.filter(o => formatDate(o.time) === today);
+          } else if (type === "week") {
+            const weekAgo = new Date(now); weekAgo.setDate(now.getDate() - 7);
+            filtered = filtered.filter(o => new Date(o.time) >= weekAgo);
+          } else if (type === "month") {
+            const monthAgo = new Date(now); monthAgo.setMonth(now.getMonth() - 1);
+            filtered = filtered.filter(o => new Date(o.time) >= monthAgo);
+          } else if (type === "range") {
+            const from = new Date(startDateInput.value);
+            const to = new Date(endDateInput.value);
+            filtered = filtered.filter(o => new Date(o.time) >= from && new Date(o.time) <= to);
+          }
+    
+          drawCharts(filtered);
+        }
+    
+        async function init() {
+          const snap = await db.collection("DoneOrders").get();
+          allOrders = snap.docs.map(d => d.data()).filter(o => o.time && o.deliveredTime);
+          applyFilter("all");
+    
+          buttons.forEach(btn => {
+            btn.onclick = () => applyFilter(btn.dataset.filter);
+          });
+    
+          startDateInput.onchange = () => applyFilter("range");
+          endDateInput.onchange = () => applyFilter("range");
+        }
+    
+        init();
+      </script>
+    </body>
+    </html>
+    
