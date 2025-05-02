@@ -6,6 +6,8 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.1.0"></script>
+
   <style>
     body { font-family: Arial, sans-serif; background: #f5f5f5; padding: 20px; direction: rtl; }
     h1 { text-align: center; color: #176B87; margin-bottom: 20px; }
@@ -57,6 +59,15 @@
     .card h4 { margin: 0 0 10px; color: #176B87; font-size: 16px; }
     .card p { margin: 5px 0; font-size: 18px; font-weight: bold; color: #000; }
     canvas { width: 100% !important; height: auto !important; }
+
+    @media (max-width: 768px) {
+  .card {
+    width: 100%;
+  }
+}
+
+
+    
   </style>
 </head>
 <body>
@@ -202,18 +213,43 @@
           document.getElementById("top-product").textContent = topProducts[0]?.[0] || "-";
     
           const ctx = id => document.getElementById(id);
-          const chart = (id, label, labels, data, color) =>
-            charts[id] = new Chart(ctx(id), {
-              type: "bar",
-              data: {
-                labels: labels,
-                datasets: [{ label, data, backgroundColor: color }]
+          const chart = (id, label, labels, data, color, avgLine) =>
+  charts[id] = new Chart(ctx(id), {
+    type: "bar",
+    data: {
+      labels: labels,
+      datasets: [{ label, data, backgroundColor: color }]
+    },
+    options: {
+      plugins: {
+        annotation: {
+          annotations: avgLine !== undefined ? {
+            line1: {
+              type: 'line',
+              yMin: avgLine,
+              yMax: avgLine,
+              borderColor: 'red',
+              borderWidth: 2,
+              label: {
+                enabled: true,
+                content: 'متوسط',
+                position: 'end'
               }
-            });
+            }
+          } : {}
+        }
+      }
+    }
+  });
+
     
           chart("topProductsChart", "عدد الطلبات", topProducts.map(p=>p[0]), topProducts.map(p=>p[1].count), "#4caf50");
-          chart("avgPrepChart", "دقائق", topProducts.map(p=>p[0]), avgTimes, "#2196f3");
-          chart("slowOrdersChart", "مدة التجهيز", slowOrders.map(o=>`طلب ${o.orderNumber}`), slowOrders.map(o=>o.duration), "#f44336");
+         const avgOfAvgTimes = avgTimes.reduce((a,b) => parseFloat(a)+parseFloat(b), 0) / avgTimes.length;
+chart("avgPrepChart", "دقائق", topProducts.map(p=>p[0]), avgTimes, "#2196f3", avgOfAvgTimes);
+
+const avgSlow = slowOrders.reduce((a,b)=>a + parseFloat(b.duration), 0) / slowOrders.length;
+chart("slowOrdersChart", "مدة التجهيز", slowOrders.map(o=>`طلب ${o.orderNumber}`), slowOrders.map(o=>o.duration), "#f44336", avgSlow);
+
           chart("topDaysChart", "عدد الطلبات", Object.keys(orderDates), Object.values(orderDates), "#FF9800");
     
           chart("qtyCountChart", "عدد مرات الطلب", Object.keys(qtyCount), Object.values(qtyCount), "#8e44ad");
