@@ -62,6 +62,21 @@
 
 
 
+    
+
+    @media (max-width: 768px) {
+  .cards-container {
+    display: block !important;
+  }
+  .cards-container > .card {
+    display: block !important;
+    float: none !important;
+    clear: both !important;
+    width: 100% !important;
+    margin-bottom: 20px !important;
+  }
+}
+
 
 
     
@@ -71,11 +86,11 @@
   <h1>📊 تحليلات الطلبات التامة</h1>
 
   <div class="filter-buttons">
-    <button data-filter="day" >📆 يوم</button>
+    <button data-filter="day">📆 يوم</button>
     <button data-filter="week">📅 أسبوع</button>
     <button data-filter="month">🗓️ شهر</button>
     <button data-filter="range">📊 فترة مخصصة</button>
-    <button data-filter="allclass="active"" >📈 كل الفترة</button>
+    <button data-filter="all" class="active">📈 كل الفترة</button>
   </div>
 
   <div class="date-range" id="dateRange">
