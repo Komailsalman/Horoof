@@ -294,7 +294,7 @@ chart("slowOrdersChart", "مدة التجهيز", slowOrders.map(o=>`طلب ${o.
         async function init() {
           const snap = await db.collection("DoneOrders").get();
           allOrders = snap.docs.map(d => d.data()).filter(o => o.time && o.deliveredTime);
-          applyFilter("all");
+          applyFilter("day");
     
           buttons.forEach(btn => {
             btn.onclick = () => applyFilter(btn.dataset.filter);
